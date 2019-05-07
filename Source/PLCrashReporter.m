@@ -377,6 +377,7 @@ static void uncaught_exception_handler (NSException *exception) {
 @interface PLCrashReporter (PrivateMethods)
 
 - (id) initWithBundle: (NSBundle *) bundle configuration: (PLCrashReporterConfig *) configuration;
+- (id) initWithDictionary: (NSDictionary *) dictionary configuration: (PLCrashReporterConfig *) configuration;
 - (id) initWithApplicationIdentifier: (NSString *) applicationIdentifier appVersion: (NSString *) applicationVersion appMarketingVersion: (NSString *) applicationMarketingVersion configuration: (PLCrashReporterConfig *) configuration;
 
 #if PLCRASH_FEATURE_MACH_EXCEPTIONS
@@ -431,6 +432,17 @@ static PLCrashReporter *sharedReporter = nil;
             sharedReporter = [[PLCrashReporter alloc] initWithBundle: [NSBundle mainBundle] configuration: [PLCrashReporterConfig defaultConfiguration]];
     } OSSpinLockUnlock(&onceLock);
 
+    return sharedReporter;
+}
+
++ (PLCrashReporter *) sharedReporterWithDictionary:(NSDictionary *) dictionary {
+    /* Once we drop 10.5 support, this may be converted to dispatch_once() */
+    static OSSpinLock onceLock = OS_SPINLOCK_INIT;
+    OSSpinLockLock(&onceLock); {
+        if (sharedReporter == nil)
+            sharedReporter = [[PLCrashReporter alloc] initWithDictionary: dictionary configuration: [PLCrashReporterConfig defaultConfiguration]];
+    } OSSpinLockUnlock(&onceLock);
+    
     return sharedReporter;
 }
 
@@ -900,6 +912,34 @@ cleanup:
         bundleIdentifier = [NSString stringWithUTF8String: progname];
     }
 
+    /* Verify that the version is available */
+    if (bundleVersion == nil) {
+        NSDEBUG(@"Warning -- bundle version unavailable");
+        bundleVersion = @"";
+    }
+    
+    return [self initWithApplicationIdentifier: bundleIdentifier appVersion: bundleVersion appMarketingVersion:bundleMarketingVersion configuration: configuration];
+}
+
+- (id) initWithDictionary: (NSDictionary *) dictionary configuration: (PLCrashReporterConfig *) configuration {
+    
+    NSString *bundleIdentifier = [dictionary objectForKey:@"Identifier"];
+    NSString *bundleVersion = [dictionary objectForKey:@"Version"];
+    NSString *bundleMarketingVersion = [dictionary objectForKey:@"VerCode"];
+    
+    /* Verify that the identifier is available */
+    if (bundleIdentifier == nil) {
+        const char *progname = getprogname();
+        if (progname == NULL) {
+            [NSException raise: PLCrashReporterException format: @"Can not determine process identifier or process name"];
+            [self release];
+            return nil;
+        }
+        
+        NSDEBUG(@"Warning -- bundle identifier, using process name %s", progname);
+        bundleIdentifier = [NSString stringWithUTF8String: progname];
+    }
+    
     /* Verify that the version is available */
     if (bundleVersion == nil) {
         NSDEBUG(@"Warning -- bundle version unavailable");

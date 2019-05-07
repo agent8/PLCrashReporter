@@ -113,6 +113,7 @@ typedef struct PLCrashReporterCallbacks {
 }
 
 + (PLCrashReporter *) sharedReporter;
++ (PLCrashReporter *) sharedReporterWithDictionary:(NSDictionary *) dictionary;
 
 - (instancetype) initWithConfiguration: (PLCrashReporterConfig *) config;
 
