@@ -924,8 +924,8 @@ cleanup:
 - (id) initWithDictionary: (NSDictionary *) dictionary configuration: (PLCrashReporterConfig *) configuration {
     
     NSString *bundleIdentifier = [dictionary objectForKey:@"Identifier"];
-    NSString *bundleVersion = [dictionary objectForKey:@"Version"];
-    NSString *bundleMarketingVersion = [dictionary objectForKey:@"VerCode"];
+    NSString *bundleVersion = [dictionary objectForKey:@"VerCode"];
+    NSString *bundleMarketingVersion = [dictionary objectForKey:@"Version"];
     
     /* Verify that the identifier is available */
     if (bundleIdentifier == nil) {
