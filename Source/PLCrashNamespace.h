@@ -37,6 +37,9 @@
  */
 #define PLCRASHREPORTER_PREFIX MS
 
+//Added by Edison. Used for HockeySDK.
+//#define PLCRASHREPORTER_PREFIX BIT
+
 
 // We need two extra layers of indirection to make CPP substitute
 // the PLCRASHREPORTER_PREFIX define.

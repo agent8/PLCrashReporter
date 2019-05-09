@@ -463,7 +463,10 @@ static PLCrashReporter *sharedReporter = nil;
     return [self initWithBundle: [NSBundle mainBundle] configuration: configuration];
 }
 
-
+//added by Edison for HockeySDK
+- (instancetype) initWithConfiguration: (PLCrashReporterConfig *) config withParams:(NSDictionary *)dictionary {
+    return [self initWithDictionary:dictionary configuration:config];
+}
 /**
  * Returns YES if the application has previously crashed and
  * an pending crash report is available.

@@ -116,6 +116,7 @@ typedef struct PLCrashReporterCallbacks {
 + (PLCrashReporter *) sharedReporterWithDictionary:(NSDictionary *) dictionary;
 
 - (instancetype) initWithConfiguration: (PLCrashReporterConfig *) config;
+- (instancetype) initWithConfiguration: (PLCrashReporterConfig *) config withParams:(NSDictionary *)dictionary; //added by Edison for HockeySDK
 
 - (BOOL) hasPendingCrashReport;
 
