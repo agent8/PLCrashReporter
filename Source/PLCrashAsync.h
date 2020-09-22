@@ -42,7 +42,7 @@ extern "C" {
 #include <TargetConditionals.h>
 #include <mach/mach.h>
 
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE && !TARGET_OS_MACCATALYST
 
 /*
  * iOS does not provide the mach_vm_* APIs, and as such, we can't support both
@@ -141,7 +141,7 @@ typedef int64_t pl_vm_off_t;
 
 #define PLCF_DEBUG(msg, args...) {\
     char __tmp_output[128];\
-    snprintf(__tmp_output, sizeof(__tmp_output), "[PLCrashReport] "); \
+    snprintf(__tmp_output, sizeof(__tmp_output), "[PLCrashReporter] "); \
     plcrash_async_writen(STDERR_FILENO, __tmp_output, strlen(__tmp_output));\
     \
     snprintf(__tmp_output, sizeof(__tmp_output), ":%d: ", __LINE__); \
@@ -195,8 +195,6 @@ typedef enum  {
 } plcrash_error_t;
 
 const char *plcrash_async_strerror (plcrash_error_t error);
-
-kern_return_t plcrash_async_read_addr (mach_port_t task, pl_vm_address_t source, void *dest, pl_vm_size_t len);
 
 bool plcrash_async_address_apply_offset (pl_vm_address_t base_address, pl_vm_off_t offset, pl_vm_address_t *result);
     
