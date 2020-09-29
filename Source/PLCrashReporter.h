@@ -111,7 +111,7 @@ typedef struct PLCrashReporterCallbacks {
     __strong NSString *_crashReportDirectory;
 }
 
-+ (PLCrashReporter *) sharedReporter PLCR_DEPRECATED;
++ (PLCrashReporter *) sharedReporter : (NSString*) basePath PLCR_DEPRECATED;
 
 - (instancetype) initWithConfiguration: (PLCrashReporterConfig *) config;
 

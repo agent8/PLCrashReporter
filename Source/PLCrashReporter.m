@@ -373,7 +373,9 @@ static void uncaught_exception_handler (NSException *exception) {
 @interface PLCrashReporter (PrivateMethods)
 
 - (id) initWithBundle: (NSBundle *) bundle configuration: (PLCrashReporterConfig *) configuration;
+- (id) initWithBundle: (NSBundle *) bundle basePath:(NSString*)basePath configuration: (PLCrashReporterConfig *) configuration;
 - (id) initWithApplicationIdentifier: (NSString *) applicationIdentifier appVersion: (NSString *) applicationVersion appMarketingVersion: (NSString *) applicationMarketingVersion configuration: (PLCrashReporterConfig *) configuration;
+- (id) initWithApplicationIdentifier: (NSString *) applicationIdentifier appVersion: (NSString *) applicationVersion appMarketingVersion: (NSString *) applicationMarketingVersion basePath:(NSString*)basePath configuration: (PLCrashReporterConfig *) configuration;
 
 #if PLCRASH_FEATURE_MACH_EXCEPTIONS
 - (PLCrashMachExceptionServer *) enableMachExceptionServerWithPreviousPortSet: (__strong PLCrashMachExceptionPortSet **) previousPortSet
@@ -419,11 +421,11 @@ static PLCrashReporter *sharedReporter = nil;
  * @deprecated As of PLCrashReporter 1.2, the default reporter instance has been deprecated, and API
  * clients should initialize a crash reporter instance directly.
  */
-+ (PLCrashReporter *) sharedReporter {
++ (PLCrashReporter *) sharedReporter : (NSString*) basePath {
     static dispatch_once_t onceLock;
     dispatch_once(&onceLock, ^{
         if (sharedReporter == nil)
-            sharedReporter = [[PLCrashReporter alloc] initWithBundle: [NSBundle mainBundle] configuration: [PLCrashReporterConfig defaultConfiguration]];
+            sharedReporter = [[PLCrashReporter alloc] initWithBundle: [NSBundle mainBundle] basePath:basePath configuration: [PLCrashReporterConfig defaultConfiguration]];
     });
     return sharedReporter;
 }
@@ -884,6 +886,41 @@ cleanup:
     return self;
 }
 
+/**
+ * @internal
+ *
+ * This is the designated initializer, but it is not intended
+ * to be called externally.
+ *
+ * @param applicationIdentifier The application identifier to be included in crash reports.
+ * @param applicationVersion The application version number to be included in crash reports.
+ * @param applicationMarketingVersion The application marketing version number to be included in crash reports.
+ * @param configuration The PLCrashReporter configuration.
+ *
+ * @todo The appId and version values should be fetched from the PLCrashReporterConfig, once the API
+ * has been extended to allow supplying these values.
+ */
+- (id) initWithApplicationIdentifier: (NSString *) applicationIdentifier appVersion: (NSString *) applicationVersion appMarketingVersion: (NSString *) applicationMarketingVersion basePath:(NSString*)basePath configuration: (PLCrashReporterConfig *) configuration {
+    /* Initialize our superclass */
+    if ((self = [super init]) == nil)
+        return nil;
+
+    /* Save the configuration */
+    _config = configuration;
+    _applicationIdentifier = applicationIdentifier;
+    _applicationVersion = applicationVersion;
+    _applicationMarketingVersion = applicationMarketingVersion;
+    
+    /* No occurances of '/' should ever be in a bundle ID, but just to be safe, we escape them */
+    NSString *appIdPath = [applicationIdentifier stringByReplacingOccurrencesOfString: @"/" withString: @"_"];
+    
+    //NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    //NSString *cacheDir = [paths objectAtIndex: 0];
+    _crashReportDirectory = [[basePath stringByAppendingPathComponent: PLCRASH_CACHE_DIR] stringByAppendingPathComponent: appIdPath];
+    
+    return self;
+}
+
 
 /**
  * @internal
@@ -917,6 +954,40 @@ cleanup:
     }
     
     return [self initWithApplicationIdentifier: bundleIdentifier appVersion: bundleVersion appMarketingVersion:bundleMarketingVersion configuration: configuration];
+}
+
+/**
+ * @internal
+ *
+ * Derive the bundle identifier and version from @a bundle.
+ *
+ * @param bundle The application's main bundle.
+ * @param configuration The PLCrashReporter configuration to use for this instance.
+ */
+- (id) initWithBundle: (NSBundle *) bundle basePath:(NSString*)basePath configuration: (PLCrashReporterConfig *) configuration {
+    NSString *bundleIdentifier = [bundle bundleIdentifier];
+    NSString *bundleVersion = [[bundle infoDictionary] objectForKey: (NSString *) kCFBundleVersionKey];
+    NSString *bundleMarketingVersion = [[bundle infoDictionary] objectForKey: @"CFBundleShortVersionString"];
+    
+    /* Verify that the identifier is available */
+    if (bundleIdentifier == nil) {
+        const char *progname = getprogname();
+        if (progname == NULL) {
+            [NSException raise: PLCrashReporterException format: @"Can not determine process identifier or process name"];
+            return nil;
+        }
+
+        PLCR_LOG("Warning -- bundle identifier, using process name %s", progname);
+        bundleIdentifier = [NSString stringWithUTF8String: progname];
+    }
+
+    /* Verify that the version is available */
+    if (bundleVersion == nil) {
+        PLCR_LOG("Warning -- bundle version unavailable");
+        bundleVersion = @"";
+    }
+    
+    return [self initWithApplicationIdentifier: bundleIdentifier appVersion: bundleVersion appMarketingVersion:bundleMarketingVersion basePath:basePath configuration: configuration];
 }
 
 #if PLCRASH_FEATURE_MACH_EXCEPTIONS
