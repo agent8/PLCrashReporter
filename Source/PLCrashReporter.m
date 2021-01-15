@@ -61,8 +61,6 @@
  * CrashReporter cache directory name. */
 static NSString *PLCRASH_CACHE_DIR = @"com.plausiblelabs.crashreporter.data";
 
-static NSString *PLCRASH_BASE_DIR = @"plcrashreporter";
-
 /** @internal
  * Crash Report file name. */
 static NSString *PLCRASH_LIVE_CRASHREPORT = @"live_report.plcrash";
@@ -428,16 +426,12 @@ static PLCrashReporter *sharedReporter = nil;
  * @deprecated As of PLCrashReporter 1.2, the default reporter instance has been deprecated, and API
  * clients should initialize a crash reporter instance directly.
  */
-
-+ (PLCrashReporter *) sharedReporter : (NSString*) basePath {
-    /* Once we drop 10.5 support, this may be converted to dispatch_once() */
-    static OSSpinLock onceLock = OS_SPINLOCK_INIT;
-    OSSpinLockLock(&onceLock); {
++ (PLCrashReporter *) sharedReporter {
+    static dispatch_once_t onceLock;
+    dispatch_once(&onceLock, ^{
         if (sharedReporter == nil)
-            sharedReporter = [[PLCrashReporter alloc] initWithBundle: [NSBundle mainBundle] basePath:basePath configuration: [PLCrashReporterConfig defaultConfiguration]];
-    } OSSpinLockUnlock(&onceLock);
-
-
+            sharedReporter = [[PLCrashReporter alloc] initWithBundle: [NSBundle mainBundle] configuration: [PLCrashReporterConfig defaultConfiguration]];
+    });
     return sharedReporter;
 }
 
@@ -458,6 +452,9 @@ static PLCrashReporter *sharedReporter = nil;
     return [self initWithBundle: [NSBundle mainBundle] configuration: configuration];
 }
 
+- (instancetype) initWithConfiguration: (PLCrashReporterConfig *) configuration basePath:(NSString*) basePath {
+    return [self initWithBundle: [NSBundle mainBundle] basePath:basePath configuration: configuration];
+}
 
 /**
  * Returns YES if the application has previously crashed and
@@ -906,6 +903,7 @@ cleanup:
  * @param applicationIdentifier The application identifier to be included in crash reports.
  * @param applicationVersion The application version number to be included in crash reports.
  * @param applicationMarketingVersion The application marketing version number to be included in crash reports.
+ * @param basePath The base path for saving the crash data. 
  * @param configuration The PLCrashReporter configuration.
  *
  * @todo The appId and version values should be fetched from the PLCrashReporterConfig, once the API
@@ -917,17 +915,17 @@ cleanup:
         return nil;
 
     /* Save the configuration */
-    _config = [configuration retain];
-    _applicationIdentifier = [applicationIdentifier retain];
-    _applicationVersion = [applicationVersion retain];
-    _applicationMarketingVersion = [applicationMarketingVersion retain];
+    _config = configuration;
+    _applicationIdentifier = applicationIdentifier;
+    _applicationVersion = applicationVersion;
+    _applicationMarketingVersion = applicationMarketingVersion;
     
     /* No occurances of '/' should ever be in a bundle ID, but just to be safe, we escape them */
     NSString *appIdPath = [applicationIdentifier stringByReplacingOccurrencesOfString: @"/" withString: @"_"];
     
     //NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     //NSString *cacheDir = [paths objectAtIndex: 0];
-    _crashReportDirectory = [[[basePath stringByAppendingPathComponent: PLCRASH_BASE_DIR] stringByAppendingPathComponent: appIdPath] retain];
+    _crashReportDirectory = [[basePath stringByAppendingPathComponent: PLCRASH_CACHE_DIR] stringByAppendingPathComponent: appIdPath];
     
     return self;
 }
@@ -973,6 +971,7 @@ cleanup:
  * Derive the bundle identifier and version from @a bundle.
  *
  * @param bundle The application's main bundle.
+ * @param basePath The base path for saving the crash data.
  * @param configuration The PLCrashReporter configuration to use for this instance.
  */
 - (id) initWithBundle: (NSBundle *) bundle basePath:(NSString*)basePath configuration: (PLCrashReporterConfig *) configuration {
@@ -985,22 +984,20 @@ cleanup:
         const char *progname = getprogname();
         if (progname == NULL) {
             [NSException raise: PLCrashReporterException format: @"Can not determine process identifier or process name"];
-            [self release];
             return nil;
         }
 
-        NSDEBUG(@"Warning -- bundle identifier, using process name %s", progname);
+        PLCR_LOG("Warning -- bundle identifier, using process name %s", progname);
         bundleIdentifier = [NSString stringWithUTF8String: progname];
     }
 
     /* Verify that the version is available */
     if (bundleVersion == nil) {
-        NSDEBUG(@"Warning -- bundle version unavailable");
+        PLCR_LOG("Warning -- bundle version unavailable");
         bundleVersion = @"";
     }
     
-    return [self initWithApplicationIdentifier: bundleIdentifier appVersion: bundleVersion appMarketingVersion:bundleMarketingVersion
-                                      basePath:basePath configuration: configuration];
+    return [self initWithApplicationIdentifier: bundleIdentifier appVersion: bundleVersion appMarketingVersion:bundleMarketingVersion basePath:basePath configuration: configuration];
 }
 
 #if PLCRASH_FEATURE_MACH_EXCEPTIONS
